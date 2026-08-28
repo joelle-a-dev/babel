@@ -224,18 +224,16 @@ export function wrapLoopBody(
   }
 
   const id = loopPath.scope.generateUid("loop");
-  const fn = t.functionExpression(
-    null,
-    closureParams,
-    t.toBlock(loopNode.body),
-  );
+  const fn = t.functionExpression(null, closureParams, t.blockStatement([]));
   let call: t.Expression = t.callExpression(t.identifier(id), callArgs);
 
-  const fnParent = loopPath.findParent(p => p.isFunction());
+  const fnParent = loopPath.findParent(p => p.isFunctionParent());
   if (fnParent) {
-    const { async, generator } = fnParent.node as t.Function;
+    // @ts-expect-error: async and generator are not on t.FunctionParent, here we provide default values for static blocks.
+    const { async = false, generator = false } =
+      fnParent.node as t.FunctionParent;
     fn.async = async;
-    fn.generator = generator ?? false;
+    fn.generator = generator;
     if (generator) call = t.yieldExpression(call, true);
     else if (async) call = t.awaitExpression(call);
   }
@@ -244,7 +242,6 @@ export function wrapLoopBody(
     updater.length > 0
       ? t.expressionStatement(t.sequenceExpression(updater))
       : null;
-  if (updaterNode) fn.body.body.push(updaterNode);
 
   // NOTE: Calling .insertBefore on the loop path might cause the
   // loop to be moved in the AST. For example, in
@@ -393,7 +390,13 @@ export function wrapLoopBody(
     }
   }
 
+  // Assign loop closure body after the original loop body was manipulated by
+  // the completion record handling above. Doing so also avoids duplicate AST
+  // nodes during the transform
+  const loopBlockBody = t.toBlock(loopNode.body);
   loopNode.body = t.blockStatement(bodyStmts);
+  fn.body = loopBlockBody;
+  if (updaterNode) loopBlockBody.body.push(updaterNode);
 
   return varPath;
 }
