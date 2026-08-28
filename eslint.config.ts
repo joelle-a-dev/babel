@@ -373,6 +373,14 @@ export default defineConfig([
     },
   },
   {
+    // The helpers/ tsconfig only type-checks (noEmit), so there's no
+    // compiled lib/helpers/*.js for these unit tests to import instead.
+    files: ["packages/babel-helpers/test/unittests/**.{js,ts}"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
     files: ["packages/babel-parser/typings/babel-parser.d.ts"],
     linterOptions: {
       reportUnusedDisableDirectives: "off",
